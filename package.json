@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start --port 3000",
     "db:setup": "tsx src/db/setup.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"src/handoff/tests/*.test.ts\""
   },
   "dependencies": {
     "next": "15.5.25",
