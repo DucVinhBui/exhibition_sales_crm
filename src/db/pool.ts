@@ -1,4 +1,14 @@
-import { Pool } from "pg";
+import { Pool, types } from "pg";
+
+// A calendar date has no timezone. node-pg's default DATE parser builds a JS Date at the
+// server's LOCAL midnight, so a follow_up_on of Friday read in a westward timezone becomes
+// Thursday -- silently moving every date in the follow-up queue by a day. Hand back the raw
+// 'YYYY-MM-DD' string instead, which is what schema.ts types as IsoDate.
+const PG_OID_DATE = 1082;
+types.setTypeParser(PG_OID_DATE, (value: string) => value);
+
+// NUMERIC (OID 1700) is already returned as a string by node-pg and must stay that way:
+// parsing a euro amount into a binary float defeats the point of using NUMERIC at all.
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
