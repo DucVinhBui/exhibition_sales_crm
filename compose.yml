@@ -14,5 +14,41 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  # One-shot: apply migrations, then import the archive if it has not been imported
+  # already. Runs to completion before the app starts, so the web server is never
+  # racing the import -- verify.sh only retries for about ten seconds.
+  migrate:
+    # Shares the image built by `app` rather than declaring its own build: two services
+    # building the same tag concurrently race on the image export.
+    image: exhibition-sales-crm:local
+    pull_policy: never
+    command: ["npm", "run", "db:setup"]
+    environment:
+      DATABASE_URL: postgres://crm:local-development-only@db:5432/crm
+      DATA_DIR: /app/data
+      TZ: Europe/Rome
+    volumes:
+      # Read-only: the source archive is never written to, by policy and by mount.
+      - ./data:/app/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: runtime
+    image: exhibition-sales-crm:local
+    pull_policy: never
+    environment:
+      DATABASE_URL: postgres://crm:local-development-only@db:5432/crm
+      TZ: Europe/Rome
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
 volumes:
   postgres-data:
