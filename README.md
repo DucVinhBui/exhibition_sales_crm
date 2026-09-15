@@ -170,7 +170,11 @@ ANALYZE` against the live archive:
 | Company search | `Bitmap Index Scan on company_name_trgm_idx` | 0.07 ms |
 | Contact search | `Bitmap Index Scan on contact_full_name_trgm_idx` | 6.2 ms |
 | Follow-up queue | `Index Scan using activity_follow_up_queue_idx` | 0.02 ms |
-| Queue counters | `Index Only Scan`, `Heap Fetches: 0` | 0.38 ms |
+| Queue counters | `Index Only Scan using activity_dated_completion_idx` | 0.38 ms |
+
+The queue counters are an index-only scan. Straight after a cold import they still show a
+handful of heap fetches, because the visibility map is not populated until autovacuum has run;
+it settles to zero once it has.
 
 The contact figure is a worst case: `de luca` matches 1,000 of the 20,000 contacts, and the
 cost is in ranking those matches, not in finding them. Name search uses trigram GIN indexes, so
