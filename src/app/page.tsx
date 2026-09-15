@@ -22,8 +22,8 @@ import {
   type ArchiveTotals,
   type CompanyHit,
   type ContactHit,
-  type Page as ResultPage,
 } from "./_lib/queries";
+import { blockSpan, blockStart, sliceBlock, type Block } from "./_lib/paging";
 import { MIN_SEARCH_LENGTH } from "./_lib/format";
 import { pageIndex, text, type SearchParams } from "./_lib/params";
 import { Pagination } from "@/components/Pagination";
@@ -136,8 +136,8 @@ function ContactTable({ rows }: { rows: ContactHit[] }) {
 
 interface Loaded {
   totals: ArchiveTotals;
-  companies: ResultPage<CompanyHit> | null;
-  contacts: ResultPage<ContactHit> | null;
+  companies: Block<CompanyHit> | null;
+  contacts: Block<ContactHit> | null;
 }
 
 export default async function SearchPage({
@@ -162,7 +162,12 @@ export default async function SearchPage({
   // asking for OFFSET 0, so every page showed the same eight exhibitors.
   const isPreview = searching && only === null;
   const size = isPreview ? PREVIEW_SIZE : FULL_PAGE_SIZE;
-  const offset = isPreview ? 0 : page * size;
+  // A paged listing asks for a whole block of pages at once and slices the one it renders out
+  // of it, which is what lets the pager print real page numbers without counting the match.
+  // The preview has no pager, so it asks for its single short page and stays on it.
+  const viewPage = isPreview ? 0 : page;
+  const fetchSize = isPreview ? size : blockSpan(size);
+  const fetchOffset = isPreview ? 0 : blockStart(page) * size;
 
   let loaded: Loaded | null = null;
   let failure: string | null = null;
@@ -171,14 +176,19 @@ export default async function SearchPage({
     const totals = await getArchiveTotals();
     if (searching) {
       const [companies, contacts] = await Promise.all([
-        only === "contacts" ? Promise.resolve(null) : searchCompanies(term, size, offset),
-        only === "companies" ? Promise.resolve(null) : searchContacts(term, size, offset),
+        only === "contacts" ? Promise.resolve(null) : searchCompanies(term, fetchSize, fetchOffset),
+        only === "companies" ? Promise.resolve(null) : searchContacts(term, fetchSize, fetchOffset),
       ]);
-      loaded = { totals, companies, contacts };
+      loaded = {
+        totals,
+        companies: companies && sliceBlock(companies, viewPage, size),
+        contacts: contacts && sliceBlock(contacts, viewPage, size),
+      };
     } else if (termTooShort) {
       loaded = { totals, companies: null, contacts: null };
     } else {
-      loaded = { totals, companies: await listCompanies(size, offset), contacts: null };
+      const companies = await listCompanies(fetchSize, fetchOffset);
+      loaded = { totals, companies: sliceBlock(companies, viewPage, size), contacts: null };
     }
   } catch (error) {
     // Kept inside a 200 response on purpose — see the note at the top of the file.
@@ -255,13 +265,13 @@ export default async function SearchPage({
       ) : null}
 
       {loaded?.companies ? (
-        <section>
+        <section id="exhibitors">
           <div className="group-heading">
             <h2 style={{ margin: 0 }}>
               {searching ? "Exhibitors matching " : "All exhibitors"}
               {searching ? <em>“{term}”</em> : null}
             </h2>
-            {searching && only === null && loaded.companies.hasMore ? (
+            {searching && only === null && loaded.companies.more ? (
               <Link
                 className="small"
                 href={`/?q=${encodeURIComponent(term)}&only=companies`}
@@ -271,52 +281,62 @@ export default async function SearchPage({
             ) : null}
           </div>
           {loaded.companies.rows.length === 0 ? (
-            <p className="empty">No exhibitor name contains that fragment.</p>
+            <p className="empty">
+              {page > 0
+                ? "That page is past the end of this listing."
+                : "No exhibitor name contains that fragment."}
+            </p>
           ) : (
-            <>
-              <CompanyTable rows={loaded.companies.rows} />
-              {only !== null || !searching ? (
-                <Pagination
-                  basePath="/"
-                  params={{ q: term, only: only ?? undefined }}
-                  page={page}
-                  hasMore={loaded.companies.hasMore}
-                  shown={loaded.companies.rows.length}
-                />
-              ) : null}
-            </>
+            <CompanyTable rows={loaded.companies.rows} />
           )}
+          {only !== null || !searching ? (
+            <Pagination
+              basePath="/"
+              params={{ q: term, only: only ?? undefined }}
+              anchor="exhibitors"
+              page={page}
+              start={loaded.companies.start}
+              pages={loaded.companies.pages}
+              more={loaded.companies.more}
+              shown={loaded.companies.rows.length}
+            />
+          ) : null}
         </section>
       ) : null}
 
       {loaded?.contacts ? (
-        <section>
+        <section id="contacts">
           <div className="group-heading">
             <h2 style={{ margin: 0 }}>
               Contacts matching <em>“{term}”</em>
             </h2>
-            {only === null && loaded.contacts.hasMore ? (
+            {only === null && loaded.contacts.more ? (
               <Link className="small" href={`/?q=${encodeURIComponent(term)}&only=contacts`}>
                 see all matching contacts →
               </Link>
             ) : null}
           </div>
           {loaded.contacts.rows.length === 0 ? (
-            <p className="empty">No contact name contains that fragment.</p>
+            <p className="empty">
+              {page > 0
+                ? "That page is past the end of this listing."
+                : "No contact name contains that fragment."}
+            </p>
           ) : (
-            <>
-              <ContactTable rows={loaded.contacts.rows} />
-              {only !== null ? (
-                <Pagination
-                  basePath="/"
-                  params={{ q: term, only }}
-                  page={page}
-                  hasMore={loaded.contacts.hasMore}
-                  shown={loaded.contacts.rows.length}
-                />
-              ) : null}
-            </>
+            <ContactTable rows={loaded.contacts.rows} />
           )}
+          {only !== null ? (
+            <Pagination
+              basePath="/"
+              params={{ q: term, only }}
+              anchor="contacts"
+              page={page}
+              start={loaded.contacts.start}
+              pages={loaded.contacts.pages}
+              more={loaded.contacts.more}
+              shown={loaded.contacts.rows.length}
+            />
+          ) : null}
         </section>
       ) : null}
 

@@ -28,6 +28,7 @@ import {
   formatDateTime,
 } from "@/app/_lib/format";
 import { pageIndex, text, type SearchParams } from "@/app/_lib/params";
+import { blockSpan, blockStart, sliceBlock } from "@/app/_lib/paging";
 import { Pagination } from "@/components/Pagination";
 import { Value } from "@/components/Unknown";
 import { markDoneAction } from "./actions";
@@ -60,10 +61,11 @@ export default async function FollowUpsPage({
     scopeRaw === "overdue" ? "overdue" : scopeRaw === "week" ? "week" : "all";
   const page = pageIndex(params);
 
-  const [queue, counts] = await Promise.all([
-    getFollowUps(scope, ARCHIVE_REFERENCE_DATE, PAGE_SIZE, page * PAGE_SIZE),
+  const [fetched, counts] = await Promise.all([
+    getFollowUps(scope, ARCHIVE_REFERENCE_DATE, blockSpan(PAGE_SIZE), blockStart(page) * PAGE_SIZE),
     getFollowUpCounts(ARCHIVE_REFERENCE_DATE),
   ]);
+  const queue = sliceBlock(fetched, page, PAGE_SIZE);
 
   const backTo = `/follow-ups?scope=${scope}${page > 0 ? `&page=${page + 1}` : ""}`;
 
@@ -123,103 +125,113 @@ export default async function FollowUpsPage({
         ))}
       </div>
 
+      <div id="queue" />
+
       {queue.rows.length === 0 ? (
         <p className="empty">
-          Nothing pending in this view. That is an empty queue, not an absent one — entries
-          whose completion marker does not apply are never counted here.
+          {page > 0 ? (
+            "That page is past the end of this queue."
+          ) : (
+            <>
+              Nothing pending in this view. That is an empty queue, not an absent one —
+              entries whose completion marker does not apply are never counted here.
+            </>
+          )}
         </p>
       ) : (
-        <>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Due</th>
-                  <th>What is owed</th>
-                  <th>Exhibitor</th>
-                  <th>Belongs to</th>
-                  <th>Owner</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {queue.rows.map((row) => {
-                  const urgency = classifyFollowUp(row.follow_up_on);
-                  return (
-                    <tr key={row.id}>
-                      <td style={{ whiteSpace: "nowrap" }}>
-                        <strong>{formatDate(row.follow_up_on)}</strong>
-                        <div>
-                          <span className={`pill ${URGENCY_PILL[urgency] ?? "pill"}`}>
-                            {describeFollowUpOffset(row.follow_up_on)}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        {row.details}
-                        <div className="small muted">
-                          {row.type} logged {formatDateTime(row.occurred_at)} ·{" "}
-                          <span className="code">{row.entry_id}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <Link href={`/companies/${encodeURIComponent(row.company_code)}`}>
-                          {row.company_name}
-                        </Link>
-                        <div className="code muted">{row.company_code}</div>
-                      </td>
-                      <td>
-                        {row.opportunity_code === null ? (
-                          <span className="small muted">
-                            The exhibitor as a whole — not tied to any enquiry or edition
-                          </span>
-                        ) : (
-                          <>
-                            <Link
-                              href={`/opportunities/${encodeURIComponent(row.opportunity_code)}`}
-                            >
-                              {row.opportunity_description}
-                            </Link>
-                            <div className="small muted">
-                              <span className="code">{row.opportunity_code}</span>
-                              {row.edition_code === null ? null : (
-                                <>
-                                  {" · "}
-                                  {row.fair_name} <span className="code">{row.edition_code}</span>
-                                </>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </td>
-                      <td>
-                        <Value text={row.sales_rep_name} unknownLabel="No owner recorded" />
-                        <div className="small muted">{row.legacy_author}</div>
-                      </td>
-                      <td>
-                        <form action={markDoneAction}>
-                          <input type="hidden" name="entry_id" value={row.entry_id} />
-                          <input type="hidden" name="back" value={backTo} />
-                          <button className="secondary" type="submit">
-                            Mark done
-                          </button>
-                        </form>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <Pagination
-            basePath="/follow-ups"
-            params={{ scope: scope === "all" ? undefined : scope }}
-            page={page}
-            hasMore={queue.hasMore}
-            shown={queue.rows.length}
-          />
-        </>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Due</th>
+                <th>What is owed</th>
+                <th>Exhibitor</th>
+                <th>Belongs to</th>
+                <th>Owner</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {queue.rows.map((row) => {
+                const urgency = classifyFollowUp(row.follow_up_on);
+                return (
+                  <tr key={row.id}>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <strong>{formatDate(row.follow_up_on)}</strong>
+                      <div>
+                        <span className={`pill ${URGENCY_PILL[urgency] ?? "pill"}`}>
+                          {describeFollowUpOffset(row.follow_up_on)}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      {row.details}
+                      <div className="small muted">
+                        {row.type} logged {formatDateTime(row.occurred_at)} ·{" "}
+                        <span className="code">{row.entry_id}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <Link href={`/companies/${encodeURIComponent(row.company_code)}`}>
+                        {row.company_name}
+                      </Link>
+                      <div className="code muted">{row.company_code}</div>
+                    </td>
+                    <td>
+                      {row.opportunity_code === null ? (
+                        <span className="small muted">
+                          The exhibitor as a whole — not tied to any enquiry or edition
+                        </span>
+                      ) : (
+                        <>
+                          <Link
+                            href={`/opportunities/${encodeURIComponent(row.opportunity_code)}`}
+                          >
+                            {row.opportunity_description}
+                          </Link>
+                          <div className="small muted">
+                            <span className="code">{row.opportunity_code}</span>
+                            {row.edition_code === null ? null : (
+                              <>
+                                {" · "}
+                                {row.fair_name} <span className="code">{row.edition_code}</span>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </td>
+                    <td>
+                      <Value text={row.sales_rep_name} unknownLabel="No owner recorded" />
+                      <div className="small muted">{row.legacy_author}</div>
+                    </td>
+                    <td>
+                      <form action={markDoneAction}>
+                        <input type="hidden" name="entry_id" value={row.entry_id} />
+                        <input type="hidden" name="back" value={backTo} />
+                        <button className="secondary" type="submit">
+                          Mark done
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
+
+      <Pagination
+        basePath="/follow-ups"
+        params={{ scope: scope === "all" ? undefined : scope }}
+        anchor="queue"
+        page={page}
+        start={queue.start}
+        pages={queue.pages}
+        more={queue.more}
+        shown={queue.rows.length}
+      />
     </main>
   );
 }

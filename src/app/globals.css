@@ -262,3 +262,39 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
   margin: 1.5rem 0 0.25rem;
 }
 .group-heading h3 { margin: 0; }
+
+/*
+ * Numbered pager. The block of page numbers is a list because that is what it is: an ordered
+ * set of destinations, which a screen reader should be able to count before entering.
+ */
+.pager { flex-wrap: wrap; }
+.pager__pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pager__page {
+  display: inline-block;
+  min-width: 2.1rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--accent);
+  text-align: center;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+.pager__page:hover { border-color: var(--accent); }
+.pager__page.is-current {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+.pager__more { color: var(--muted); padding: 0 0.15rem; }
+.button.is-disabled { opacity: 0.4; cursor: default; }
