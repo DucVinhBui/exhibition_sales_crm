@@ -69,8 +69,9 @@ export default async function OpportunityPage({
   // The two money columns mean different things and are allowed to differ. A difference is
   // worth pointing at, not reconciling: amount_eur is what sales expects to invoice,
   // client_budget_eur is what the customer said they would spend.
+  // Either figure missing means there is no gap to describe -- not a gap of zero.
   const budgetGap =
-    opportunity.client_budget_eur === null
+    opportunity.client_budget_eur === null || opportunity.amount_eur === null
       ? null
       : compareDecimal(opportunity.client_budget_eur, opportunity.amount_eur);
 
@@ -95,6 +96,12 @@ export default async function OpportunityPage({
       </p>
 
       {error !== "" ? <p className="notice notice--alarm">{error}</p> : null}
+      {saved === "created" ? (
+        <p className="notice notice--ok">
+          Enquiry opened against this edition. The stand area and requested height are still
+          unknown — fill in the brief below, then run the assistant.
+        </p>
+      ) : null}
       {saved === "brief" ? (
         <p className="notice notice--ok">Brief saved. Empty fields were stored as unknown.</p>
       ) : null}
@@ -159,7 +166,14 @@ export default async function OpportunityPage({
       <h2>The enquiry</h2>
       <section className="panel">
         <div className="facts">
-          <Fact label="Status" note={`Legacy spelling in the export: "${opportunity.legacy_status_raw}"`}>
+          <Fact
+            label="Status"
+            note={
+              opportunity.legacy_status_raw === null
+                ? "Opened in this CRM — this enquiry was never in the old system."
+                : `Legacy spelling in the export: "${opportunity.legacy_status_raw}"`
+            }
+          >
             <StatusBadge status={opportunity.status} raw={opportunity.legacy_status_raw} />{" "}
             <span className="small muted">commercial only — not a technical approval</span>
           </Fact>
@@ -186,7 +200,11 @@ export default async function OpportunityPage({
             )}
           </Fact>
           <Fact label="Opportunity value" note="What sales expects to invoice, excluding VAT.">
-            {formatEuro(opportunity.amount_eur)}
+            <Value
+              text={formatEuro(opportunity.amount_eur)}
+              unknownLabel="Not yet recorded"
+              note="Sales has put no figure on this enquiry. Unknown, not zero — and with no customer budget either, it sits below Gate A."
+            />
           </Fact>
           <Fact
             label="Customer budget"

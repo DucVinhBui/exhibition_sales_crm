@@ -89,10 +89,14 @@ export function coordinate(brief: Brief, review: Review, context: HandoffContext
     height_phrase: describeHeight(opportunity.requested_height_m),
     limit_phrase:
       fair_edition?.max_stand_height_m == null ? null : describeHeight(fair_edition.max_stand_height_m),
+    // null when neither figure is on file. The templates that use it are only reached once
+    // Gate A has passed, which requires one of the two, but the type has to say so.
     money_phrase:
-      opportunity.client_budget_eur === null
-        ? `an opportunity value of ${formatEuro(opportunity.amount_eur)}`
-        : `a budget of ${formatEuro(opportunity.client_budget_eur)}`,
+      opportunity.client_budget_eur !== null
+        ? `a budget of ${formatEuro(opportunity.client_budget_eur)}`
+        : opportunity.amount_eur !== null
+          ? `an opportunity value of ${formatEuro(opportunity.amount_eur)}`
+          : null,
     outstanding_labels: review.outstanding.map((item) => item.label),
     blocked_kind: review.blockers.some((blocker) => blocker.code === "HEIGHT_EXCEEDS_EDITION_LIMIT")
       ? "CONFLICT"

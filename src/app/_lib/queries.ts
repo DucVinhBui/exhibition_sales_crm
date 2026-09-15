@@ -183,6 +183,107 @@ export async function listCompanies(limit: number, offset: number): Promise<Page
  * autovacuum's first pass). That is reported as null -- unknown, not zero -- and the screen
  * simply omits the figure rather than claiming the archive is empty.
  */
+export interface FairEditionOption {
+  id: Id;
+  edition_code: string;
+  fair_name: string;
+  city: string | null;
+  starts_on: IsoDate;
+  ends_on: IsoDate;
+  max_stand_height_m: Decimal | null;
+}
+
+/**
+ * Every edition, for the "open a new enquiry" picker.
+ *
+ * No index note and no pagination: the archive holds sixteen editions and a fair calendar is
+ * not a table that grows with the customer base. The height limit travels with the option so
+ * the picker can state the rule the enquiry will be judged against BEFORE it is created --
+ * the operator should see "5,00 m allowed" while choosing, not discover it from a BLOCKED
+ * handoff afterwards.
+ */
+export async function listFairEditions(): Promise<FairEditionOption[]> {
+  const { rows } = await pool.query<FairEditionOption>(
+    `SELECT fe.id,
+            fe.edition_code,
+            f.name AS fair_name,
+            fe.city,
+            fe.starts_on,
+            fe.ends_on,
+            fe.max_stand_height_m
+       FROM fair_edition fe
+       JOIN fair f ON f.id = fe.fair_id
+      ORDER BY f.name, fe.starts_on DESC`,
+  );
+  return rows;
+}
+
+export interface NewOpportunity {
+  company_id: Id;
+  contact_id: Id | null;
+  fair_edition_id: Id;
+  description: string;
+  /** null = sales has put no figure on it yet. Never 0. */
+  amount_eur: Decimal | null;
+  opened_on: IsoDate;
+  brief_notes: string;
+}
+
+/**
+ * Opens an enquiry from the company screen and returns its new code.
+ *
+ * The code is allocated inside the INSERT, from the highest OP-number already present. It is
+ * not a sequence: the archive brings its own codes (OP000001..OP015000 today) and a sequence
+ * seeded at 1 would collide with every one of them on the first insert after a reset. Reading
+ * the maximum in the same statement that writes the row keeps allocation and insertion atomic
+ * against the statement's snapshot.
+ *
+ * Two concurrent creations can still read the same maximum and race, so the unique constraint
+ * is treated as the arbiter and the loser simply retries. That is the correct division of
+ * labour: the database decides, the application does not pretend to have prevented it.
+ *
+ * status is OPEN and legacy_status_raw is NULL -- see db/migrations/004_new_enquiries.sql.
+ */
+export async function insertOpportunity(entry: NewOpportunity): Promise<string> {
+  const statement = `
+    INSERT INTO opportunity (
+      opportunity_code, company_id, contact_id, fair_edition_id, description,
+      amount_eur, status, legacy_status_raw, opened_on, brief_notes
+    )
+    SELECT 'OP' || lpad(
+             (COALESCE(max(substring(o.opportunity_code FROM 3)::bigint), 0) + 1)::text, 6, '0'),
+           $1::bigint, $2::bigint, $3::bigint, $4::text,
+           $5::numeric, 'OPEN', NULL, $6::date, $7::text
+      FROM opportunity o
+     WHERE o.opportunity_code ~ '^OP[0-9]+$'
+    RETURNING opportunity_code
+  `;
+  const values = [
+    entry.company_id,
+    entry.contact_id,
+    entry.fair_edition_id,
+    entry.description,
+    entry.amount_eur,
+    entry.opened_on,
+    entry.brief_notes,
+  ];
+
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const { rows } = await pool.query<{ opportunity_code: string }>(statement, values);
+      const created = rows[0];
+      // RETURNING on a successful single-row INSERT always yields one row; this guards the
+      // type rather than a real possibility.
+      if (created === undefined) throw new Error("The enquiry was not created.");
+      return created.opportunity_code;
+    } catch (error) {
+      const duplicate =
+        typeof error === "object" && error !== null && (error as { code?: string }).code === "23505";
+      if (!duplicate || attempt >= 2) throw error;
+    }
+  }
+}
+
 export interface ArchiveTotals {
   companies: number | null;
   contacts: number | null;
@@ -290,9 +391,9 @@ export interface CompanyOpportunity {
   id: Id;
   opportunity_code: string;
   description: string;
-  amount_eur: Decimal;
+  amount_eur: Decimal | null;
   status: OpportunityStatus;
-  legacy_status_raw: string;
+  legacy_status_raw: string | null;
   opened_on: IsoDate;
   expected_close_on: IsoDate | null;
   stand_area_sqm: Decimal | null;
@@ -426,9 +527,9 @@ export interface OpportunityDetail {
   id: Id;
   opportunity_code: string;
   description: string;
-  amount_eur: Decimal;
+  amount_eur: Decimal | null;
   status: OpportunityStatus;
-  legacy_status_raw: string;
+  legacy_status_raw: string | null;
   opened_on: IsoDate;
   expected_close_on: IsoDate | null;
   historical_campaign_code: string | null;

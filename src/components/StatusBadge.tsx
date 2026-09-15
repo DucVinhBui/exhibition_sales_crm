@@ -21,13 +21,16 @@ export function StatusBadge({
   raw,
 }: {
   status: OpportunityStatus;
-  raw: string;
+  /** null on an enquiry opened in the CRM: there is no legacy spelling to report. */
+  raw: string | null;
 }) {
-  const normalisedFromRaw = raw.trim().toUpperCase();
+  const normalisedFromRaw = raw === null ? status : raw.trim().toUpperCase();
   const title =
-    normalisedFromRaw === status
-      ? `Legacy spelling: "${raw}"`
-      : `Legacy spelling: "${raw}" (normalised by trim + upper)`;
+    raw === null
+      ? "Opened in this CRM — no legacy spelling to normalise."
+      : normalisedFromRaw === status
+        ? `Legacy spelling: "${raw}"`
+        : `Legacy spelling: "${raw}" (normalised by trim + upper)`;
   return (
     <span className={`pill ${TONE[status]}`} title={title}>
       {status}

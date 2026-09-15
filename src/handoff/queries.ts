@@ -40,10 +40,10 @@ interface OpportunityRow {
   id: string;
   opportunity_code: string;
   description: string;
-  amount_eur: string;
+  amount_eur: string | null;
   client_budget_eur: string | null;
   status: HandoffContext["opportunity"]["status"];
-  legacy_status_raw: string;
+  legacy_status_raw: string | null;
   opened_on: string;
   expected_close_on: string | null;
   stand_area_sqm: string | null;

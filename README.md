@@ -28,7 +28,7 @@ do not re-import.
 Every version is pinned exactly, `package-lock.json` is committed, installs use `npm ci`, and
 the image builds for both `linux/amd64` and `linux/arm64`.
 
-**Time spent:** about 3 hours.
+**Time spent:** about 4 hours.
 
 ## The competing requests
 
@@ -64,6 +64,13 @@ is attached to an opportunity, and the opportunity is scoped to one fair *editio
 timeline on an enquiry shows only that edition's conversations, and says so on the page.
 The 5,001 company-level entries stay on the company, where they belong.
 
+The account managers' request has a structural answer too. A contact hangs off the company and
+is reused by every enquiry, so nobody re-keys a person per fair; and a returning exhibitor is a
+**new enquiry against the same company row**, opened from the company page against whichever
+edition they are coming back for. Nothing is copied forward and last year's record is not
+edited, which is precisely how the coordinator's complaint is prevented rather than merely
+discouraged.
+
 ### Rules the assistant will not break
 
 - **An absent height is not an approval.** A missing value blocks or qualifies; it never helps.
@@ -83,6 +90,14 @@ archive enquiries give the three different outcomes:
 | **Complete** | [`/opportunities/OP000001`](http://localhost:3000/opportunities/OP000001) | `ACCEPTED` — 80 m² at 4.00 m against BEAUTY-2027's 4.50 m limit, budget recorded, nothing outstanding |
 | **Incomplete** | [`/opportunities/OP000003`](http://localhost:3000/opportunities/OP000003) | `PROVISIONAL` — €30,000 budget so scoping can start, but area *and* height are both unknown |
 | **Conflicting** | [`/opportunities/OP000005`](http://localhost:3000/opportunities/OP000005) | `BLOCKED` — 6.00 m requested against PACK-2026's 5.00 m limit |
+
+A fourth outcome exists that no archive row can reach. Open a new enquiry from any exhibitor
+page, leave the opportunity value empty, and run the assistant: it returns `BLOCKED` on a
+*precondition* rather than a conflict, because neither a budget nor a value is on file and Gate
+A has nothing commercial to stand on. Every archive row carries an `amount_eur`, so that branch
+of the policy was unreachable until enquiries could be created — see
+`db/migrations/004_new_enquiries.sql`. Add a budget, run it again, and it becomes
+`PROVISIONAL`.
 
 To watch the decision change: on `OP000003`, edit the brief, fill in a stand area and a height,
 and run the assistant again. It moves to `ACCEPTED`, and the earlier `PROVISIONAL` run is still
@@ -118,6 +133,20 @@ back as strings, because a binary float cannot hold a decimal-comma euro amount 
 Every column the archive can leave empty is nullable, with **no defaults anywhere**. The schema
 carries its reasoning in `COMMENT ON` — including on the columns where the obvious change would
 be wrong.
+
+Migration `004` relaxes two `NOT NULL`s that were true of the archive but not of the product.
+`amount_eur` is what sales expects to invoice, and a brand-new enquiry genuinely has no figure
+yet; requiring one would force an invented number in front of technical. `legacy_status_raw` is
+the spelling the *old system* used, and a row created here was never in the old system, so
+writing `OPEN` into it would claim a provenance it does not have. Both are now `NULL` on
+CRM-created rows and unchanged on all 15,000 imported ones. The positive-value `CHECK` needs no
+amendment: `NULL > 0` is `NULL`, a `CHECK` only rejects `FALSE`, so a missing amount passes and
+a zero still fails loudly.
+
+New enquiry codes are allocated inside the `INSERT`, from the highest `OP`-number present.
+A sequence would have been wrong: the archive brings its own codes and a sequence seeded at 1
+would collide with every one of them on the first insert after a reset. Two concurrent
+creations can still race, so the `UNIQUE` constraint is the arbiter and the loser retries.
 
 ## Import decisions
 
@@ -210,8 +239,19 @@ persistence, and the three archive enquiries above.
 - **Company-level activity is read-only.** New entries can only be created from an enquiry,
   which guarantees they can never leak into the company-wide log. There is no UI for adding a
   company-level entry.
+- **Exhibitors and contacts cannot be created in the CRM.** Enquiries can — the company page
+  opens one against any edition, which is what a returning exhibitor actually is — but the
+  company and contact rows themselves still come only from the archive. A genuinely new
+  customer, or a new person at an existing one, cannot be entered. Both are the same shape of
+  work as the enquiry form (a validated insert against an existing table, with empty fields
+  stored as unknown) and neither needs a schema change; they were left out to keep the first
+  version to the three operations the brief names. It is the gap I would close first.
+- **Nothing can be deleted or archived.** There is no way to withdraw an enquiry opened by
+  mistake, and no soft-delete column to carry the reason if there were.
 - **The assistant reads a fixed context.** It sees the opportunity, its company and contact,
   the fair edition and the enquiry's recent activity. It does not read the company's other
   enquiries or prior editions, which would be the obvious next step.
 - **No pagination on the company detail page.** An exhibitor with hundreds of enquiries would
-  render them all. The archive's maximum is small enough that it does not bite.
+  render them all. The archive's maximum is small enough that it does not bite. The search,
+  result and follow-up listings *are* paged, with numbered pages drawn from a bounded ten-page
+  block fetch rather than a `COUNT(*)` over the match — see `src/app/_lib/paging.ts`.

@@ -44,12 +44,12 @@ export interface ContextOpportunity {
   opportunity_code: string;
   description: string;
   /** The sales team's recorded value. Not the customer's budget, not a stand price. */
-  amount_eur: Decimal;
+  amount_eur: Decimal | null;
   /** The customer's stated budget. null = unknown, never 0. */
   client_budget_eur: Decimal | null;
   status: OpportunityStatus;
   /** Kept beside `status` so the 13-spellings normalisation stays auditable in the run. */
-  legacy_status_raw: string;
+  legacy_status_raw: string | null;
   opened_on: IsoDate;
   expected_close_on: IsoDate | null;
   /** null = UNKNOWN. Never zero square metres. */

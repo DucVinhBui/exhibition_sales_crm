@@ -99,7 +99,10 @@ function collectFacts(context: HandoffContext): { known: BriefFact[]; unknown: B
     label: "Commercial status",
     // The raw spelling is shown beside the normalised one: the archive spells it 13 ways and
     // the operator should be able to see what the CRM actually holds.
-    value: `${opportunity.status} (recorded as "${opportunity.legacy_status_raw}")`,
+    value:
+      opportunity.legacy_status_raw === null
+        ? `${opportunity.status} (opened in this CRM)`
+        : `${opportunity.status} (recorded as "${opportunity.legacy_status_raw}")`,
     raw: opportunity.status,
   });
 
@@ -118,12 +121,20 @@ function collectFacts(context: HandoffContext): { known: BriefFact[]; unknown: B
     });
   }
 
-  known.push({
-    field: "opportunity.amount_eur",
-    label: "Opportunity value",
-    value: formatEuro(opportunity.amount_eur),
-    raw: opportunity.amount_eur,
-  });
+  if (opportunity.amount_eur === null) {
+    unknown.push({
+      field: "opportunity.amount_eur",
+      label: "Opportunity value",
+      note: "Sales has recorded no value for this enquiry. Unknown, not zero.",
+    });
+  } else {
+    known.push({
+      field: "opportunity.amount_eur",
+      label: "Opportunity value",
+      value: formatEuro(opportunity.amount_eur),
+      raw: opportunity.amount_eur,
+    });
+  }
 
   if (opportunity.client_budget_eur === null) {
     unknown.push({
@@ -233,10 +244,21 @@ export function prepare(context: HandoffContext): Brief {
   const firstFollowUp = context.open_follow_ups[0];
   const firstFollowUpDate = firstFollowUp?.follow_up_on ?? null;
 
-  const money_line =
-    opportunity.client_budget_eur === null
-      ? `The customer has not stated a budget; sales records the opportunity at ${formatEuro(opportunity.amount_eur)}.`
-      : `The customer's stated budget is ${formatEuro(opportunity.client_budget_eur)}, against a recorded opportunity value of ${formatEuro(opportunity.amount_eur)}.`;
+  const money_line = (() => {
+    const budget = opportunity.client_budget_eur;
+    const amount = opportunity.amount_eur;
+    // Ordered so that each branch narrows the next: once the amount-is-null cases are gone,
+    // the remaining two can format it without a cast.
+    if (amount === null) {
+      return budget === null
+        ? "Neither a customer budget nor a recorded opportunity value is on file, so this enquiry has no commercial figure at all."
+        : `The customer's stated budget is ${formatEuro(budget)}; sales has not yet recorded an opportunity value.`;
+    }
+    if (budget === null) {
+      return `The customer has not stated a budget; sales records the opportunity at ${formatEuro(amount)}.`;
+    }
+    return `The customer's stated budget is ${formatEuro(budget)}, against a recorded opportunity value of ${formatEuro(amount)}.`;
+  })();
 
   const dimension_line = (() => {
     const area = opportunity.stand_area_sqm;

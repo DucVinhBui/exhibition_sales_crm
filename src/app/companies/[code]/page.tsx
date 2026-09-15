@@ -17,8 +17,12 @@ import {
   getCompanyLevelActivity,
   getCompanyOpportunities,
   getCompanyByCode,
+  listFairEditions,
   type CompanyOpportunity,
 } from "@/app/_lib/queries";
+import { ARCHIVE_REFERENCE_DATE } from "@/app/_lib/format";
+import { text, type SearchParams } from "@/app/_lib/params";
+import { createEnquiryAction } from "./actions";
 import { formatDate, formatEditionRun, formatEuro, formatArea, formatHeight } from "@/app/_lib/format";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { HeightAgainstLimit } from "@/components/HeightCheck";
@@ -78,18 +82,27 @@ function countEnquiries(fair: FairGroup): number {
   return fair.editions.reduce((total, edition) => total + edition.opportunities.length, 0);
 }
 
-export default async function CompanyPage({ params }: { params: Promise<{ code: string }> }) {
+export default async function CompanyPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ code: string }>;
+  searchParams: Promise<SearchParams>;
+}) {
   const { code } = await params;
+  const query = await searchParams;
+  const error = text(query, "error");
   const company = await getCompanyByCode(decodeURIComponent(code));
   if (company === null) {
     notFound();
   }
 
-  const [contacts, opportunities, companyActivity, split] = await Promise.all([
+  const [contacts, opportunities, companyActivity, split, editions] = await Promise.all([
     getCompanyContacts(company.id),
     getCompanyOpportunities(company.id),
     getCompanyLevelActivity(company.id, COMPANY_ACTIVITY_LIMIT),
     getCompanyActivitySplit(company.id),
+    listFairEditions(),
   ]);
 
   const fairs = groupByFair(opportunities);
@@ -100,6 +113,8 @@ export default async function CompanyPage({ params }: { params: Promise<{ code: 
       <p className="crumbs">
         <Link href="/">Search</Link> › Exhibitor
       </p>
+
+      {error !== "" ? <p className="notice notice--alarm">{error}</p> : null}
 
       <h1>{company.name}</h1>
       <p className="lede">
@@ -248,7 +263,13 @@ export default async function CompanyPage({ params }: { params: Promise<{ code: 
                               `${row.contact_first_name} ${row.contact_last_name}`
                             )}
                           </td>
-                          <td className="num">{formatEuro(row.amount_eur)}</td>
+                          <td className="num">
+                            <Value
+                              text={formatEuro(row.amount_eur)}
+                              unknownLabel="Not recorded"
+                              note="Sales has put no figure on this enquiry. Unknown, not zero."
+                            />
+                          </td>
                           <td className="num">
                             <Value
                               text={formatEuro(row.client_budget_eur)}
@@ -283,6 +304,88 @@ export default async function CompanyPage({ params }: { params: Promise<{ code: 
       )}
 
       {/* ------------------------------------------------------- company-wide activity */}
+      <h2 id="new-enquiry">Open a new enquiry</h2>
+      <p className="lede">
+        A returning exhibitor is a NEW enquiry against the same company record — never an edit
+        of last year&apos;s. The contacts above are reused as they are; nobody re-keys a person
+        per fair.
+      </p>
+      <form action={createEnquiryAction} className="panel">
+        <input type="hidden" name="company_code" value={company.company_code} />
+        <div className="form-grid">
+          <div className="field field--wide">
+            <label htmlFor="fair_edition_id">Fair edition</label>
+            <select id="fair_edition_id" name="fair_edition_id" required defaultValue="">
+              <option value="" disabled>
+                Choose an edition…
+              </option>
+              {editions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.fair_name} · {option.edition_code} ·{" "}
+                  {formatEditionRun(option.starts_on, option.ends_on)} · height limit{" "}
+                  {formatHeight(option.max_stand_height_m) ?? "not recorded"}
+                </option>
+              ))}
+            </select>
+            <span className="field__hint">
+              The edition fixes the dates, the venue and the height limit this enquiry will be
+              judged against. Each edition stands on its own — choosing 2027 carries nothing
+              over from 2026.
+            </span>
+          </div>
+          <div className="field field--wide">
+            <label htmlFor="description">Description</label>
+            <input
+              id="description"
+              name="description"
+              required
+              placeholder="e.g. Next edition: product launch stand"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="contact_id">Primary contact</label>
+            <select id="contact_id" name="contact_id" defaultValue="">
+              <option value="">Not yet known</option>
+              {contacts.map((contact) => (
+                <option key={contact.id} value={contact.id}>
+                  {contact.first_name} {contact.last_name}
+                </option>
+              ))}
+            </select>
+            <span className="field__hint">
+              Reused from the list above — never re-keyed. Optional: an enquiry can arrive
+              before anyone knows who is running it, and that is unknown, not the company
+              itself.
+            </span>
+          </div>
+          <div className="field">
+            <label htmlFor="opened_on">Opened on</label>
+            <input id="opened_on" type="date" name="opened_on" required defaultValue={ARCHIVE_REFERENCE_DATE} />
+            <span className="field__hint">Defaults to the archive reference date.</span>
+          </div>
+          <div className="field">
+            <label htmlFor="amount_eur">Opportunity value (EUR)</label>
+            <input id="amount_eur" name="amount_eur" inputMode="decimal" placeholder="e.g. 48000,00" />
+            <span className="field__hint">
+              What sales expects to invoice. Leave empty if there is no figure yet — empty is
+              stored as unknown, not 0, and an enquiry with no budget either sits below Gate A
+              until one is recorded.
+            </span>
+          </div>
+          <div className="field field--wide">
+            <label htmlFor="brief_notes">Brief notes</label>
+            <textarea id="brief_notes" name="brief_notes" rows={3} placeholder="What the stand needs, so far." />
+          </div>
+        </div>
+        <div className="form-actions">
+          <button type="submit">Open enquiry</button>
+          <span className="small muted">
+            The stand area and requested height are filled in on the enquiry itself, where an
+            over-limit request is saved as asked and the conflict is shown.
+          </span>
+        </div>
+      </form>
+
       <h2>Company-wide activity — not tied to any fair edition</h2>
       <p className="small muted">
         {split.company_level === 0 ? (

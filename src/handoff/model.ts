@@ -188,7 +188,14 @@ export interface DecisionReasonInput {
   area_phrase: string;
   height_phrase: string;
   limit_phrase: string | null;
-  money_phrase: string;
+  /**
+   * null when the enquiry carries neither a customer budget nor an opportunity value. Only
+   * the ACCEPTED and PROVISIONAL templates read it, and both are reached only after Gate A
+   * has accepted one of the two figures, so the fallback below is unreachable by
+   * construction -- it exists so that a future policy change cannot turn a missing figure
+   * into the string "undefined" on a salesperson's screen.
+   */
+  money_phrase: string | null;
   outstanding_labels: readonly string[];
   /**
    * Why a BLOCKED run is blocked. CONFLICT means the brief asks for something the edition
@@ -218,13 +225,13 @@ export function composeDecisionReason(input: DecisionReasonInput): string {
 
   if (input.decision === "ACCEPTED") {
     return paragraph([
-      `Ready for technical handoff: ${input.opportunity_code}${at} is ${input.area_phrase} at ${input.height_phrase}${input.limit_phrase === null ? "" : `, within the ${input.limit_phrase} limit`}, with ${input.money_phrase} recorded.`,
+      `Ready for technical handoff: ${input.opportunity_code}${at} is ${input.area_phrase} at ${input.height_phrase}${input.limit_phrase === null ? "" : `, within the ${input.limit_phrase} limit`}, with ${input.money_phrase ?? "no commercial figure"} recorded.`,
       "Nothing is outstanding and nothing conflicts with the edition rules.",
     ]);
   }
 
   return paragraph([
-    `Provisional handoff: ${input.opportunity_code}${at} has ${input.money_phrase} recorded, so technical can start scoping,`,
+    `Provisional handoff: ${input.opportunity_code}${at} has ${input.money_phrase ?? "no commercial figure"} recorded, so technical can start scoping,`,
     `but ${joinList(input.outstanding_labels.map((label) => label.toLowerCase()))} ${verbFor(input.outstanding_labels.length)} still unknown and must be confirmed before anything is quoted or built.`,
     "This is not a complete brief and must not be worked as one.",
   ]);

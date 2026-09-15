@@ -176,13 +176,17 @@ export interface Opportunity {
   description: string;
   /**
    * The sales team's recorded opportunity value in EUR, excluding VAT. Not a calculated
-   * stand price and not the customer's budget — see `client_budget_eur`.
+   * stand price and not the customer's budget — see `client_budget_eur`. null = not yet
+   * recorded; every archive row carries one, an enquiry opened here need not.
    */
-  amount_eur: Decimal;
+  amount_eur: Decimal | null;
   /** Normalised status. Carries no technical approval. */
   status: OpportunityStatus;
-  /** The status exactly as exported, whitespace and casing intact. */
-  legacy_status_raw: string;
+  /**
+   * The status exactly as exported, whitespace and casing intact. null on an enquiry opened
+   * inside the CRM: it was never in the old system, so there is no legacy spelling to keep.
+   */
+  legacy_status_raw: string | null;
   opened_on: IsoDate;
   /**
    * Expected date of the SALES decision. null = none recorded — not closed, not overdue,
