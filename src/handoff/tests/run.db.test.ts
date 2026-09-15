@@ -26,10 +26,18 @@ const OP_INCOMPLETE = "ZZTEST-OP-INCOMPLETE";
 const OP_BREACH = "ZZTEST-OP-BREACH";
 const OP_NO_LIMIT = "ZZTEST-OP-NOLIMIT";
 
+// These tests need a live PostgreSQL. `npm test` on a bare host has no DATABASE_URL, so the
+// whole file would otherwise fail rather than skip -- a red result that says nothing about
+// the code. Skip with a reason instead, and run it against the stack with:
+//   docker compose exec app npm test
+const NO_DB = !process.env.DATABASE_URL;
+const SKIP_REASON = "DATABASE_URL is not set; run against the compose stack";
+
 let db: PoolClient;
 let archiveImported = false;
 
 before(async () => {
+  if (NO_DB) return;
   db = await pool.connect();
   await db.query("BEGIN");
 
@@ -91,13 +99,14 @@ before(async () => {
 });
 
 after(async () => {
+  if (NO_DB) return;
   // Append-only in production; rolled back here. Nothing this suite wrote survives.
   await db.query("ROLLBACK");
   db.release();
   await pool.end();
 });
 
-describe("persistence", () => {
+describe("persistence", { skip: NO_DB && SKIP_REASON }, () => {
   test("a run appends exactly one row, with the snapshot, both role outputs and the policy version", async () => {
     const record = await runHandoff({ opportunityCode: OP_COMPLETE }, { db });
 
@@ -189,7 +198,7 @@ describe("persistence", () => {
   });
 });
 
-describe("the archive walkthrough (skipped until the import has run)", () => {
+describe("the archive walkthrough (skipped until the import has run)", { skip: NO_DB && SKIP_REASON }, () => {
   test("OP000001 -> ACCEPTED, 80 m² at 4.0 m against a 4.5 m limit", async (t) => {
     if (!archiveImported) return t.skip("archive not imported yet");
     const record = await runHandoff({ opportunityCode: "OP000001" }, { db });

@@ -8,7 +8,7 @@
  * will ever acquire any: the entire file is template composition over facts that were read
  * from the CRM before it was called.
  *
- * The guarantees, which the tests in tests/model.test.ts enforce:
+ * The guarantees, which the tests in tests/determinism.test.ts enforce:
  *
  *   * PURE. No `Math.random()`, no `Date`, no `process.hrtime`, no filesystem, no network,
  *     no module-level mutable state. The same input produces byte-identical output, today

@@ -1,0 +1,21 @@
+# Build context hygiene. The Dockerfile COPYs explicit paths, so nothing here changes what
+# lands in the image -- it keeps the daemon from being handed hundreds of megabytes of
+# node_modules and git history on every ./dev.sh.
+.git
+.gitignore
+.gitattributes
+node_modules
+.next
+next-env.d.ts
+tsconfig.tsbuildinfo
+.DS_Store
+npm-debug.log*
+
+# The archive is mounted read-only by compose at run time, never baked into the image.
+data
+
+# Notes and internal tooling, not part of the application.
+.claude
+README.md
+ASSIGNMENT.md
+docs

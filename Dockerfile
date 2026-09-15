@@ -1,6 +1,8 @@
-# syntax=docker/dockerfile:1.19
-# Multi-arch by construction: node's official images cover linux/amd64 and linux/arm64,
-# and every dependency is pure JavaScript (pg included), so nothing here is arch-specific.
+# Multi-arch by construction: node's official images cover linux/amd64 and linux/arm64, and
+# package-lock.json carries prebuilt linux-x64 AND linux-arm64 binaries for every native
+# dependency (esbuild via tsx, @next/swc, sharp), so nothing here is arch-specific. No
+# syntax directive: the classic frontend builds this file, and docker/dockerfile is not a
+# Docker Official Image.
 # Bookworm rather than Alpine to avoid the SWC/musl surprises in Next's build step.
 
 FROM node:22.22.0-bookworm-slim AS deps
@@ -27,7 +29,7 @@ ENV NODE_ENV=production \
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
-COPY --from=build /app/.next ./.next
+COPY --chown=node:node --from=build /app/.next ./.next
 COPY tsconfig.json next.config.mjs ./
 COPY src ./src
 COPY db ./db
