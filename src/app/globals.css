@@ -1,18 +1,264 @@
+/*
+ * Plain CSS, no framework, no CDN. This is a sales tool: the job of the styling is to make
+ * the distinctions in the data legible -- known vs unknown, this edition vs another edition,
+ * pending vs completed vs not applicable -- and nothing more.
+ */
+
 :root {
   --ink: #1a1a1a;
-  --muted: #666;
+  --muted: #6b6560;
   --line: #e0ddd7;
   --ground: #faf9f7;
+  --panel: #ffffff;
   --accent: #8a5a2b;
+  --accent-soft: #f4ece2;
+  --alarm: #9b1c1c;
+  --alarm-soft: #fdeceb;
+  --warn: #8a6100;
+  --warn-soft: #fdf5e2;
+  --ok: #1f5c34;
+  --ok-soft: #ecf5ee;
   color-scheme: light;
 }
+
 * { box-sizing: border-box; }
+
 body {
   margin: 0;
   background: var(--ground);
   color: var(--ink);
   font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
 }
-main { max-width: 68rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+
+main {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 1.75rem 1rem 4rem;
+}
+
 h1 { font-size: 1.5rem; letter-spacing: -0.01em; margin: 0 0 0.25rem; }
+h2 { font-size: 1.1rem; margin: 2rem 0 0.35rem; }
+h3 { font-size: 0.98rem; margin: 1.25rem 0 0.35rem; }
+p { margin: 0.35rem 0; }
+
 a { color: var(--accent); }
+a:hover { text-decoration: none; }
+
+/* ---------------------------------------------------------------------------- header */
+
+.site-header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.site-header__inner {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1.25rem;
+}
+.site-header__brand {
+  font-weight: 650;
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+.site-header__nav { display: flex; gap: 1rem; }
+.site-header__nav a { text-decoration: none; color: var(--muted); }
+.site-header__nav a:hover { color: var(--accent); }
+.site-header__clock { margin-left: auto; color: var(--muted); font-size: 0.8rem; }
+
+/* ------------------------------------------------------------------------ primitives */
+
+.lede { color: var(--muted); margin: 0 0 1.25rem; max-width: 46rem; }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+.code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  margin: 0.75rem 0;
+}
+
+.crumbs { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.5rem; }
+.crumbs a { color: var(--muted); }
+
+/*
+ * Unknown. Deliberately a word, never a bare dash and never a zero: an absent area is not
+ * 0 m² and an absent height is not an approval.
+ */
+.unknown {
+  color: var(--muted);
+  font-style: italic;
+  border-bottom: 1px dotted var(--line);
+  cursor: help;
+}
+.unknown--blocking { color: var(--warn); border-bottom-color: currentColor; }
+
+.pill {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pill--ok      { background: var(--ok-soft);     color: var(--ok);     border-color: #cde0d3; }
+.pill--warn    { background: var(--warn-soft);   color: var(--warn);   border-color: #ecdcb0; }
+.pill--alarm   { background: var(--alarm-soft);  color: var(--alarm);  border-color: #f0cdcb; }
+.pill--accent  { background: var(--accent-soft); color: var(--accent); border-color: #e4d6c4; }
+
+.notice {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--muted);
+  background: var(--panel);
+  border-radius: 4px;
+  padding: 0.6rem 0.8rem;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+}
+.notice--alarm { border-left-color: var(--alarm); background: var(--alarm-soft); }
+.notice--warn  { border-left-color: var(--warn);  background: var(--warn-soft); }
+.notice--ok    { border-left-color: var(--ok);    background: var(--ok-soft); }
+
+/* ----------------------------------------------------------------------------- search */
+
+.searchbar { display: flex; gap: 0.5rem; margin: 0.75rem 0 0.35rem; flex-wrap: wrap; }
+.searchbar input[type="search"] {
+  flex: 1 1 22rem;
+  padding: 0.55rem 0.7rem;
+  font-size: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+}
+button, .button {
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+button.secondary, .button.secondary {
+  background: var(--panel);
+  color: var(--accent);
+}
+button:disabled { opacity: 0.45; cursor: default; }
+
+.filters { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.6rem 0 1rem; }
+.filters a {
+  font-size: 0.85rem;
+  text-decoration: none;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+}
+.filters a[aria-current="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------------------------------- tables */
+
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+tbody tr:hover { background: #fcfbf9; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.table-wrap { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; }
+
+/* -------------------------------------------------------------------- definition grid */
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.85rem 1.5rem; margin: 0.75rem 0; }
+.fact__label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.fact__value { font-size: 0.98rem; }
+.fact__note { font-size: 0.8rem; color: var(--muted); }
+
+/* --------------------------------------------------------------------------- timeline */
+
+.timeline { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.timeline__item { border-left: 2px solid var(--line); padding: 0 0 0.9rem 0.85rem; margin-left: 0.3rem; position: relative; }
+.timeline__item:last-child { padding-bottom: 0; }
+.timeline__head { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; font-size: 0.82rem; color: var(--muted); }
+.timeline__details { margin: 0.15rem 0 0; }
+.timeline__foot { font-size: 0.82rem; color: var(--muted); margin-top: 0.2rem; }
+.timeline__item--pending { border-left-color: var(--warn); }
+.timeline__item--overdue { border-left-color: var(--alarm); }
+
+/* ------------------------------------------------------------------------------ forms */
+
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.85rem 1rem; }
+.field { display: flex; flex-direction: column; gap: 0.2rem; }
+.field--wide { grid-column: 1 / -1; }
+.field label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.field input, .field select, .field textarea {
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  font-size: 0.92rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  width: 100%;
+}
+.field textarea { min-height: 5rem; resize: vertical; }
+.field__hint { font-size: 0.78rem; color: var(--muted); }
+.form-actions { margin-top: 0.9rem; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------------------- handoff */
+
+.handoff__badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border: 1px dashed #d9bf7a;
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+}
+.run { border: 1px solid var(--line); border-radius: 5px; background: var(--panel); margin: 0.6rem 0; }
+.run > summary { padding: 0.6rem 0.8rem; cursor: pointer; display: flex; gap: 0.6rem; align-items: baseline; flex-wrap: wrap; }
+.run > summary::-webkit-details-marker { color: var(--muted); }
+.run__body { padding: 0 0.9rem 0.9rem; border-top: 1px solid var(--line); }
+.run__reason { margin: 0.6rem 0; }
+.finding { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.25rem 0; border-bottom: 1px dotted var(--line); font-size: 0.9rem; }
+.finding:last-child { border-bottom: 0; }
+
+/* ------------------------------------------------------------------------- pagination */
+
+.pager { display: flex; gap: 0.6rem; align-items: center; margin: 0.9rem 0; font-size: 0.88rem; }
+.pager .muted { margin-left: 0.25rem; }
+
+.empty { color: var(--muted); font-style: italic; padding: 0.75rem 0; }
+
+.group-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 1.5rem 0 0.25rem;
+}
+.group-heading h3 { margin: 0; }
