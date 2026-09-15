@@ -153,8 +153,15 @@ export default async function SearchPage({
 
   const searching = term.length >= MIN_SEARCH_LENGTH;
   const termTooShort = term.length > 0 && !searching;
+  // Two layouts share this route. The SEARCH PREVIEW stacks a short companies table above a
+  // short contacts table and offers "see all" links instead of a pager, so it is the one and
+  // only case that pins the offset to zero. Every other layout -- the default "All exhibitors"
+  // browse, and either single-entity result list -- renders a pager, so its offset must follow
+  // the page. Keying that off `only === null` alone silently caught the browse listing too, and
+  // "Next" then paged a URL parameter while the query kept returning the first rows forever.
+  const isPreview = searching && only === null;
   const size = only === null ? PREVIEW_SIZE : FULL_PAGE_SIZE;
-  const offset = only === null ? 0 : page * size;
+  const offset = isPreview ? 0 : page * size;
 
   let loaded: Loaded | null = null;
   let failure: string | null = null;
