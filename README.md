@@ -143,6 +143,15 @@ CRM-created rows and unchanged on all 15,000 imported ones. The positive-value `
 amendment: `NULL > 0` is `NULL`, a `CHECK` only rejects `FALSE`, so a missing amount passes and
 a zero still fails loudly.
 
+Moving an enquiry along the funnel writes twice in **one transaction**: the new
+`opportunity.status`, and a `note` activity on the same enquiry saying who moved it, from what
+to what and why. `status` holds only the current value, so an `UPDATE` on its own would destroy
+the answer to "who marked this won, and when?" — and half of the pair is worse than neither.
+The note is `is_completed = NULL`, not applicable: it is a fact about what happened, not a task,
+so it never reaches the follow-up queue. No order is enforced between the five statuses,
+because real enquiries skip stages and go backwards and the archive records every status with
+no path between them.
+
 New enquiry codes are allocated inside the `INSERT`, from the highest `OP`-number present.
 A sequence would have been wrong: the archive brings its own codes and a sequence seeded at 1
 would collide with every one of them on the first insert after a reset. Two concurrent
@@ -248,6 +257,10 @@ persistence, and the three archive enquiries above.
   version to the three operations the brief names. It is the gap I would close first.
 - **Nothing can be deleted or archived.** There is no way to withdraw an enquiry opened by
   mistake, and no soft-delete column to carry the reason if there were.
+- **Status history is prose, not structure.** The move is recorded as a timeline note, which a
+  person can read but a query cannot group by. "How long does an enquiry sit in PROPOSAL?"
+  needs a `status_change` table with typed from/to columns; the note carries the facts to
+  reconstruct one, but nothing reads them back.
 - **The assistant reads a fixed context.** It sees the opportunity, its company and contact,
   the fair edition and the enquiry's recent activity. It does not read the company's other
   enquiries or prior editions, which would be the obvious next step.

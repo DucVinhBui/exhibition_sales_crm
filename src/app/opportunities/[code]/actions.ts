@@ -14,9 +14,10 @@
 import { revalidatePath } from "next/cache";
 import { runHandoff } from "@/handoff";
 import { redirect } from "next/navigation";
-import type { ActivityType } from "@/db/schema";
-import { ACTIVITY_TYPES } from "@/db/schema";
+import type { ActivityType, OpportunityStatus } from "@/db/schema";
+import { ACTIVITY_TYPES, OPPORTUNITY_STATUSES } from "@/db/schema";
 import {
+  changeOpportunityStatus,
   getOpportunityByCode,
   insertActivity,
   updateOpportunityBrief,
@@ -175,4 +176,51 @@ export async function runHandoffAction(formData: FormData): Promise<void> {
 
   revalidatePath(`/opportunities/${code}`);
   back(code, { ran: decision });
+}
+
+/**
+ * Moves the enquiry along the commercial funnel.
+ *
+ * Two things this deliberately does NOT do.
+ *
+ * It does not enforce an order. OPEN -> QUALIFIED -> PROPOSAL -> WON is how the funnel is
+ * meant to run, but real enquiries skip stages (a returning exhibitor arrives qualified) and
+ * go backwards (a WON deal collapses). A state machine here would make the CRM disagree with
+ * what actually happened, and the archive already contains the evidence: it holds every
+ * status with no recorded path between them.
+ *
+ * It does not touch the handoff. Commercial status and technical readiness are separate axes
+ * -- WON records that the customer signed, never that the stand can be built -- so marking an
+ * enquiry won neither accepts nor invalidates any handoff run.
+ */
+export async function changeStatusAction(formData: FormData): Promise<void> {
+  const code = field(formData, "opportunity_code");
+  if (code === "") redirect("/");
+
+  const opportunity = await getOpportunityByCode(code);
+  if (opportunity === null) back(code, { error: "That enquiry no longer exists." });
+
+  const wanted = field(formData, "status");
+  if (!OPPORTUNITY_STATUSES.includes(wanted as OpportunityStatus)) {
+    back(code, { error: "Choose one of the five commercial statuses." });
+  }
+  const next = wanted as OpportunityStatus;
+
+  if (next === opportunity.status) {
+    back(code, { error: `This enquiry is already ${opportunity.status}. Nothing was changed.` });
+  }
+
+  await changeOpportunityStatus({
+    opportunity_id: opportunity.id,
+    company_id: opportunity.company_id,
+    from: opportunity.status,
+    to: next,
+    reason: field(formData, "reason").trim(),
+    author: field(formData, "legacy_author").trim() || "crm.user",
+    at: new Date(),
+  });
+
+  revalidatePath(`/opportunities/${code}`);
+  revalidatePath(`/companies/${opportunity.company_code}`);
+  back(code, { saved: `status:${next}` });
 }

@@ -31,7 +31,8 @@ import { HandoffPanel } from "@/components/HandoffPanel";
 import { HeightCheckNotice } from "@/components/HeightCheck";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Fact, Value } from "@/components/Unknown";
-import { logActivityAction, runHandoffAction, saveBriefAction } from "./actions";
+import { OPPORTUNITY_STATUSES } from "@/db/schema";
+import { changeStatusAction, logActivityAction, runHandoffAction, saveBriefAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,12 @@ export default async function OpportunityPage({
         <p className="notice notice--ok">
           Enquiry opened against this edition. The stand area and requested height are still
           unknown — fill in the brief below, then run the assistant.
+        </p>
+      ) : null}
+      {saved.startsWith("status:") ? (
+        <p className="notice notice--ok">
+          Moved to <strong>{saved.slice("status:".length)}</strong>. The change is recorded on
+          the timeline below with who made it — commercial status only, no technical approval.
         </p>
       ) : null}
       {saved === "brief" ? (
@@ -256,6 +263,49 @@ export default async function OpportunityPage({
           </Fact>
         </div>
       </section>
+
+      <form action={changeStatusAction} className="panel">
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="status">Move this enquiry to</label>
+            <select id="status" name="status" defaultValue={opportunity.status}>
+              {OPPORTUNITY_STATUSES.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <span className="field__hint">
+              No order is enforced. Real enquiries skip stages and go backwards, and a CRM that
+              refused to record that would disagree with what happened.
+            </span>
+          </div>
+          <div className="field">
+            <label htmlFor="status_reason">Why (optional)</label>
+            <input id="status_reason" name="reason" placeholder="e.g. Signed at the Milan meeting" />
+          </div>
+          <div className="field">
+            <label htmlFor="status_author">Changed by</label>
+            <input
+              id="status_author"
+              name="legacy_author"
+              defaultValue={opportunity.sales_rep_name ?? ""}
+              placeholder="Your name"
+            />
+          </div>
+        </div>
+        <input type="hidden" name="opportunity_code" value={opportunity.opportunity_code} />
+        <div className="form-actions">
+          <button type="submit" className="secondary">
+            Change status
+          </button>
+          <span className="small muted">
+            The move is written to the timeline in the same transaction — the status never
+            changes without a record of who moved it. WON records that the customer signed,
+            never that the stand can be built.
+          </span>
+        </div>
+      </form>
 
       {/* ------------------------------------------------------------------ edit brief */}
       <h2>Update the brief</h2>

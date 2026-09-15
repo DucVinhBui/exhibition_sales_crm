@@ -855,6 +855,69 @@ export async function updateOpportunityBrief(
   return (rowCount ?? 0) > 0;
 }
 
+export interface StatusChange {
+  opportunity_id: Id;
+  company_id: Id;
+  from: OpportunityStatus;
+  to: OpportunityStatus;
+  /** Free text the operator adds; may be empty. */
+  reason: string;
+  author: string;
+  at: Date;
+}
+
+/**
+ * Moves an enquiry along the commercial funnel and records that it moved.
+ *
+ * `opportunity.status` holds only the CURRENT value, so an UPDATE on its own destroys the
+ * answer to "who marked this won, and when?". The transition is therefore also written as an
+ * activity entry on the same enquiry, which is where this application already keeps history
+ * -- no new table, and the change appears in the timeline beside the conversations that
+ * caused it.
+ *
+ * Both writes go in ONE transaction. Half of this pair is worse than neither: a status with
+ * no record of who moved it is exactly the gap the entry exists to close, and an entry
+ * describing a move that did not happen is a lie in the timeline.
+ *
+ * The entry is a `note` with is_completed NULL -- not applicable. It is a fact about what
+ * happened, not a task, and it must never appear in the follow-up queue.
+ */
+export async function changeOpportunityStatus(change: StatusChange): Promise<void> {
+  const detail =
+    change.reason === ""
+      ? `Status moved from ${change.from} to ${change.to}.`
+      : `Status moved from ${change.from} to ${change.to}. ${change.reason}`;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`UPDATE opportunity SET status = $2::opportunity_status WHERE id = $1`, [
+      change.opportunity_id,
+      change.to,
+    ]);
+    await client.query(
+      `INSERT INTO activity
+              (entry_id, company_id, opportunity_id, type, occurred_at,
+               details, follow_up_on, is_completed, legacy_author)
+       VALUES ($1, $2, $3, 'note'::activity_type, $4, $5, NULL, NULL, $6)`,
+      [
+        `UI-${crypto.randomUUID()}`,
+        change.company_id,
+        change.opportunity_id,
+        change.at,
+        detail,
+        change.author,
+      ],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export interface NewActivity {
   company_id: Id;
   /** null records a company-wide entry; a value scopes it to that one enquiry. */
